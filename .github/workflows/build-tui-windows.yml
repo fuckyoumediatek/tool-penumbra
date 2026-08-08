@@ -1,0 +1,51 @@
+name: Build and Release Penumbra (Windows)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: # Botón manual
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build for Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Clone shomykohai/penumbra
+        uses: actions/checkout@v4
+        with:
+          repository: 'shomykohai/penumbra'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build Project
+        run: cargo build --release
+
+      - name: Prepare executables
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release_files
+          
+          # Busca CUALQUIER archivo .exe compilado y lo copia
+          Get-ChildItem -Path target\release\ -Filter *.exe -File | Copy-Item -Destination release_files\
+          
+          Write-Host "Ejecutables encontrados y copiados:"
+          Get-ChildItem -Path release_files\ | Select-Object Name
+
+      - name: Upload to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          # Le inventa un tag y nombre único basado en el ID de la ejecución (así nunca falla)
+          tag_name: build-${{ github.run_id }}
+          name: Ejecutables Compilados (Build ${{ github.run_id }})
+          files: release_files/*.exe
