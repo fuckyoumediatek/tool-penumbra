@@ -4,50 +4,45 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch: # Botón manual activado
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   build-and-release:
-    name: Build for Windows
+    name: Build exactly the TUI folder
     runs-on: windows-latest
 
     steps:
-      # 1. Clona exactamente TU repositorio/fork
       - name: Checkout fuckyoumediatek/tool-penumbra
         uses: actions/checkout@v4
         with:
           repository: 'fuckyoumediatek/tool-penumbra'
 
-      # 2. Instala Rust para Windows
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
 
-      # 3. Cache para que no tarde una vida la próxima vez
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
 
-      # 4. Compila todo el proyecto
-      - name: Build Project
-        run: cargo build --release
+      # AQUÍ ESTÁ LA MAGIA: Le decimos que compile SOLO el Cargo.toml de la carpeta tui
+      - name: Build TUI folder specifically
+        run: cargo build --release --manifest-path tui/Cargo.toml
 
-      # 5. Agarra CUALQUIER .exe generado (el del tui, el del cli, lo que sea)
       - name: Prepare executables
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release_files
           
-          # Busca sin importar el nombre y lo copia
-          Get-ChildItem -Path target\release\ -Filter *.exe -File | Copy-Item -Destination release_files\
+          # Busca cualquier .exe en cualquier carpeta "target\release" del repositorio y lo copia
+          Get-ChildItem -Path . -Filter *.exe -Recurse | Where-Object { $_.FullName -match "target\\release" } | Copy-Item -Destination release_files\
           
           Write-Host "Ejecutables encontrados y copiados:"
           Get-ChildItem -Path release_files\ | Select-Object Name
 
-      # 6. Lo sube a GitHub Releases sí o sí
       - name: Upload to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
