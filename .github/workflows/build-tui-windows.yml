@@ -1,10 +1,10 @@
-name: Build and Release Penumbra (Windows)
+name: Build and Release Penumbra TUI (Windows)
 
 on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch: # Botón manual
+  workflow_dispatch: # Botón manual activado
 
 permissions:
   contents: write
@@ -15,37 +15,42 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Clone shomykohai/penumbra
+      # 1. Clona exactamente TU repositorio/fork
+      - name: Checkout fuckyoumediatek/tool-penumbra
         uses: actions/checkout@v4
         with:
-          repository: 'shomykohai/penumbra'
+          repository: 'fuckyoumediatek/tool-penumbra'
 
+      # 2. Instala Rust para Windows
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
 
+      # 3. Cache para que no tarde una vida la próxima vez
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
 
+      # 4. Compila todo el proyecto
       - name: Build Project
         run: cargo build --release
 
+      # 5. Agarra CUALQUIER .exe generado (el del tui, el del cli, lo que sea)
       - name: Prepare executables
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release_files
           
-          # Busca CUALQUIER archivo .exe compilado y lo copia
+          # Busca sin importar el nombre y lo copia
           Get-ChildItem -Path target\release\ -Filter *.exe -File | Copy-Item -Destination release_files\
           
           Write-Host "Ejecutables encontrados y copiados:"
           Get-ChildItem -Path release_files\ | Select-Object Name
 
+      # 6. Lo sube a GitHub Releases sí o sí
       - name: Upload to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          # Le inventa un tag y nombre único basado en el ID de la ejecución (así nunca falla)
           tag_name: build-${{ github.run_id }}
           name: Ejecutables Compilados (Build ${{ github.run_id }})
           files: release_files/*.exe
